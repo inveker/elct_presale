@@ -1,0 +1,18 @@
+node_modules
+.vscode
+.idea
+.env
+coverage
+coverage.json
+typechain
+typechain-types
+
+#Hardhat files
+cache
+artifacts
+deployments/localhost
+abi
+gui
+bin
+config.json
+soljson*
