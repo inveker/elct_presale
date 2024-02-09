@@ -42,6 +42,7 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
 
 
     function buy(uint256 _elctAmount, address _payToken, uint256 _maxPayTokenAmount) external payable nonReentrant {
+        require(_elctAmount != 0, "_elctAmount is zero!");
         IERC20Metadata _elct = IERC20Metadata(elct);
         uint256 payTokenAmount = elctAmountToToken(_elctAmount, _payToken);
         require(payTokenAmount <= _maxPayTokenAmount, "_maxPayTokenAmount!");
