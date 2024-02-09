@@ -37,7 +37,7 @@ const config: HardhatUserConfig = {
       chainId: 1337,
       forking: {
         url: 'https://rpc.ankr.com/bsc',
-        blockNumber: 28951238,
+        blockNumber: 35983550,
       },
       blockGasLimit: 30000000,
       accounts: {

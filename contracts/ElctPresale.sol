@@ -13,7 +13,7 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
     using SafeERC20 for IERC20Metadata;
     
     address public elct;
-    uint256 public elctPricer;
+    address public elctPricer;
 
     uint256 public constant USD_DECIMALS = 18;
     uint256 public constant PRICERS_DECIMALS = 8;
@@ -62,7 +62,6 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
     }
 
     function _addPayToken(address _payToken, address _payTokenPricer) internal {
-        require(_payToken != address(0), "_payToken is zero!");
         require(_payTokenPricer != address(0), "_payTokenPricer is zero!");
         require(IPricer(_payTokenPricer).decimals() == PRICERS_DECIMALS, "pricer decimals!");
         (, int256 price, , , ) = IPricer(_payTokenPricer).latestRoundData();
