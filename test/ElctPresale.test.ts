@@ -8,20 +8,10 @@ import {
   IERC20Metadata__factory,
 } from '../typechain-types'
 import { getImplementationAddress } from '@openzeppelin/upgrades-core'
-import { USDT } from '../constants/addresses'
+import { BNB_PLACEHOLDER, LINK, USDT, WBNB } from '../constants/addresses'
 import { setBalance } from '@nomicfoundation/hardhat-network-helpers'
 import ERC20Minter from './utils/ERC20Minter'
-
-const INITIAL_DATA = {
-  totalSupply: ethers.utils.parseUnits('1000000000', 18),
-  ownerAddress: '0xBF87F4C03d765Ba17fbec79e7b4fd167fD8895Df',
-}
-
-const TEST_DATA = [
-  {
-    payTokenAddress: USDT,
-  },
-]
+import { balanceOf } from './utils/token'
 
 describe(`ElctPresale`, () => {
   let initSnapshot: string
@@ -56,63 +46,120 @@ describe(`ElctPresale`, () => {
     initSnapshot = await ethers.provider.send('evm_snapshot', [])
   })
 
-  describe(`Common tests`, () => {
-    it('Regular unit: Upgarde only deployer', async () => {
-      const elctPresaleFactory = await ethers.getContractFactory('ElctPresale')
-      const newElctPresale = await elctPresaleFactory.deploy()
-      const newImplementationAddress = newElctPresale.address
-      await elctPresale.connect(owner).upgradeTo(newImplementationAddress)
-      const implementationAddress = await getImplementationAddress(
-        ethers.provider,
-        elctPresale.address,
-      )
-      assert(
-        newImplementationAddress == implementationAddress,
-        `newImplementationAddress != implementationAddress. ${newImplementationAddress} != ${implementationAddress}`,
-      )
-    })
-
-    it('Error unit: Upgarde not owner', async () => {
-      const newImplementationAddress = ethers.constants.AddressZero
-      await expect(
-        elctPresale.connect(user).upgradeTo(newImplementationAddress),
-      ).to.be.revertedWith('Ownable: caller is not the owner')
-    })
-
-    it('Error unit: ownerShip not owner', async () => {
-      await expect(elctPresale.connect(user).transferOwnership(user.address)).to.be.revertedWith(
-        'Ownable: caller is not the owner',
-      )
-    })
-
-    it('Error unit: elctAmount == 0', async () => {
-      await expect(elctPresale.connect(user).buy(0, USDT, 0)).to.be.revertedWith(
-        '_elctAmount is zero!',
-      )
-    })
+  it('Regular unit: Upgarde only deployer', async () => {
+    const elctPresaleFactory = await ethers.getContractFactory('ElctPresale')
+    const newElctPresale = await elctPresaleFactory.deploy()
+    const newImplementationAddress = newElctPresale.address
+    await elctPresale.connect(owner).upgradeTo(newImplementationAddress)
+    const implementationAddress = await getImplementationAddress(
+      ethers.provider,
+      elctPresale.address,
+    )
+    assert(
+      newImplementationAddress == implementationAddress,
+      `newImplementationAddress != implementationAddress. ${newImplementationAddress} != ${implementationAddress}`,
+    )
   })
 
-  for (const testData of TEST_DATA) {
-    const { payTokenAddress } = testData
-    describe(`ElctPresale. Test data: ${JSON.stringify(testData)}`, () => {
+  it('Error unit: Upgarde not owner', async () => {
+    const newImplementationAddress = ethers.constants.AddressZero
+    await expect(elctPresale.connect(user).upgradeTo(newImplementationAddress)).to.be.revertedWith(
+      'Ownable: caller is not the owner',
+    )
+  })
+
+  it('Error unit: ownerShip not owner', async () => {
+    await expect(elctPresale.connect(user).transferOwnership(user.address)).to.be.revertedWith(
+      'Ownable: caller is not the owner',
+    )
+  })
+
+  it('Error unit: elctAmount == 0', async () => {
+    await expect(elctPresale.connect(user).buy(0, USDT, 0)).to.be.revertedWith(
+      '_elctAmount is zero!',
+    )
+  })
+
+  it('Regular: buy for BNB', async () => {
+    const payTokenAddress = BNB_PLACEHOLDER
+    await ERC20Minter.mint(payTokenAddress, user.address, 10000)
+
+    const elctAmount = ethers.utils.parseUnits('100', 18)
+    const payTokenAmount = await elctPresale.elctAmountToToken(elctAmount, payTokenAddress)
+    const balanceBefore = await balanceOf(elct.address, user.address)
+    const change = 1000
+    const payTokenAmountWithChange = payTokenAmount.add(change)
+    await elctPresale.connect(user).buy(elctAmount, payTokenAddress, ethers.constants.MaxUint256, {
+      value: payTokenAmountWithChange,
+    })
+    const balanceAfter = await balanceOf(elct.address, user.address)
+    assert(
+      balanceAfter.sub(balanceBefore).eq(elctAmount),
+      `elct balance failed! balanceAfter - balanceBefore != elctAmount. ${balanceAfter} - ${balanceBefore} != ${elctAmount}`,
+    )
+    assert(
+      (await balanceOf(payTokenAddress, elctPresale.address)).gte(payTokenAmount),
+      'payTokens not recieved!',
+    )
+    assert(
+      (await balanceOf(payTokenAddress, elctPresale.address)).lt(payTokenAmountWithChange),
+      'change not returned!',
+    )
+  })
+
+  it('Regular: slippage BNB', async () => {
+    const payTokenAddress = BNB_PLACEHOLDER
+    await ERC20Minter.mint(payTokenAddress, user.address, 10000)
+    const elctAmount = ethers.utils.parseUnits('100', 18)
+    const payTokenAmount = await elctPresale.elctAmountToToken(elctAmount, payTokenAddress)
+    await expect(
+      elctPresale.connect(user).buy(elctAmount, payTokenAddress, payTokenAmount.sub(1), {
+        value: payTokenAmount,
+      }),
+    ).to.be.revertedWith('_maxPayTokenAmount!')
+  })
+
+  it('Error: buy for unknown token', async () => {
+    const payTokenAddress = LINK
+    await ERC20Minter.mint(payTokenAddress, user.address, 10000)
+
+    const elctAmount = ethers.utils.parseUnits('100', 18)
+    await expect(
+      elctPresale.connect(user).buy(elctAmount, payTokenAddress, ethers.constants.MaxUint256),
+    ).to.be.revertedWith('not supported token!')
+  })
+
+  for (const payTokenAddress of [USDT, WBNB]) {
+    describe(`ElctPresale. Pay token ${payTokenAddress}`, () => {
       it('Regular: buy', async () => {
         await ERC20Minter.mint(payTokenAddress, user.address, 10000)
+
+        const elctAmount = ethers.utils.parseUnits('100', 18)
+        const payTokenAmount = elctPresale.elctAmountToToken(elctAmount, payTokenAddress)
         const payToken = IERC20Metadata__factory.connect(payTokenAddress, user)
-        const ecltAmount = ethers.utils.parseUnits('100', 18)
-        await payToken.approve(
-          elctPresale.address,
-          ethers.constants.MaxUint256,
-        )
-        const balanceBefore = await elct.balanceOf(user.address)
+        await payToken.approve(elctPresale.address, payTokenAmount)
+        const balanceBefore = await balanceOf(elct.address, user.address)
         await elctPresale
           .connect(user)
-          .buy(ecltAmount, payTokenAddress, ethers.constants.MaxUint256)
-        const balanceAfter = await elct.balanceOf(user.address)
+          .buy(elctAmount, payTokenAddress, ethers.constants.MaxUint256)
+        const balanceAfter = await balanceOf(elct.address, user.address)
         assert(
-          balanceAfter.sub(balanceBefore).eq(ecltAmount),
-          `elct balance failed! balanceAfter - balanceBefore != ecltAmount. ${balanceAfter} - ${balanceBefore} != ${ecltAmount}`,
+          balanceAfter.sub(balanceBefore).eq(elctAmount),
+          `elct balance failed! balanceAfter - balanceBefore != elctAmount. ${balanceAfter} - ${balanceBefore} != ${elctAmount}`,
         )
-        assert((await payToken.balanceOf(elctPresale.address)).gt(0), "payTokens not recieved!")
+        assert(
+          (await balanceOf(payTokenAddress, elctPresale.address)).gt(0),
+          'payTokens not recieved!',
+        )
+      })
+
+      it(`Regular: slippage ${payTokenAddress}`, async () => {
+        await ERC20Minter.mint(payTokenAddress, user.address, 10000)
+        const elctAmount = ethers.utils.parseUnits('100', 18)
+        const payTokenAmount = await elctPresale.elctAmountToToken(elctAmount, payTokenAddress)
+        await expect(
+          elctPresale.connect(user).buy(elctAmount, payTokenAddress, payTokenAmount.sub(1)),
+        ).to.be.revertedWith('_maxPayTokenAmount!')
       })
     })
   }

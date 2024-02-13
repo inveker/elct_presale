@@ -48,8 +48,6 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
         require(payTokenAmount <= _maxPayTokenAmount, "_maxPayTokenAmount!");
         if(_payToken == address(0)) {
             require(msg.value >= payTokenAmount, "value < payTokenAmount");
-            (bool success, ) = address(this).call{value: payTokenAmount}("");
-            require(success, "failed to send to treasury!");
             uint256 change = msg.value - payTokenAmount;
             if(change > 0) {
                 (bool success,) = msg.sender.call{value: change}("");
@@ -92,8 +90,9 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
         require(address(pricer) != address(0), "not supported token!");
 
         (, int256 tokenPrice, , , ) = pricer.latestRoundData();
+        uint256 decimals = _token == address(0) ? 18 : IERC20Metadata(_token).decimals();
         return
-            (_elctAmount * (10 ** IERC20Metadata(_token).decimals()) * (10 ** PRICERS_DECIMALS)) /
+            (_elctAmount * (10 ** decimals) * (10 ** PRICERS_DECIMALS)) /
             uint256(tokenPrice) /
             1e18;
     }
