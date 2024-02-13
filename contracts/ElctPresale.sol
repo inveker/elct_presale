@@ -11,7 +11,7 @@ import { IPricer } from "./interfaces/IPricer.sol";
 
 contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20Metadata;
-    
+
     address public elct;
     address public elctPricer;
 
@@ -40,23 +40,26 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
         }
     }
 
-
-    function buy(uint256 _elctAmount, address _payToken, uint256 _maxPayTokenAmount) external payable nonReentrant {
+    function buy(
+        uint256 _elctAmount,
+        address _payToken,
+        uint256 _maxPayTokenAmount
+    ) external payable nonReentrant {
         require(_elctAmount != 0, "_elctAmount is zero!");
         IERC20Metadata _elct = IERC20Metadata(elct);
         uint256 payTokenAmount = elctAmountToToken(_elctAmount, _payToken);
         require(payTokenAmount <= _maxPayTokenAmount, "_maxPayTokenAmount!");
-        if(_payToken == address(0)) {
+        if (_payToken == address(0)) {
             require(msg.value >= payTokenAmount, "value < payTokenAmount");
             uint256 change = msg.value - payTokenAmount;
-            if(change > 0) {
-                (bool success,) = msg.sender.call{value: change}("");
+            if (change > 0) {
+                (bool success, ) = msg.sender.call{ value: change }("");
                 require(success, "failed to send change!");
             }
         } else {
             IERC20Metadata(_payToken).safeTransferFrom(msg.sender, address(this), payTokenAmount);
         }
-        
+
         _elct.safeTransfer(msg.sender, _elctAmount);
     }
 
@@ -82,7 +85,12 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
 
     function withdraw(address _token, uint256 _amount) external {
         _checkOwner();
-        IERC20Metadata(_token).safeTransfer(msg.sender, _amount);
+        if (_token == address(0)) {
+            (bool success, ) = msg.sender.call{value: _amount}("");
+            require(success, "withdraw transfer failed!");
+        } else {
+            IERC20Metadata(_token).safeTransfer(msg.sender, _amount);
+        }
     }
 
     function elctAmountToToken(uint256 _elctAmount, address _token) public view returns (uint256) {

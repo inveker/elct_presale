@@ -8,7 +8,7 @@ import {
   IERC20Metadata__factory,
 } from '../typechain-types'
 import { getImplementationAddress } from '@openzeppelin/upgrades-core'
-import { BNB_PLACEHOLDER, LINK, USDT, WBNB } from '../constants/addresses'
+import { BNB_PLACEHOLDER, CHAINLINK_LINK_USD, ELCT, LINK, USDT, WBNB } from '../constants/addresses'
 import { setBalance } from '@nomicfoundation/hardhat-network-helpers'
 import ERC20Minter from './utils/ERC20Minter'
 import { balanceOf } from './utils/token'
@@ -127,6 +127,38 @@ describe(`ElctPresale`, () => {
     await expect(
       elctPresale.connect(user).buy(elctAmount, payTokenAddress, ethers.constants.MaxUint256),
     ).to.be.revertedWith('not supported token!')
+  })
+
+  for (const payTokenAddress of [ELCT, BNB_PLACEHOLDER, USDT, WBNB]) {
+    it(`Regular: owner withdraw ${payTokenAddress}`, async () => {
+      const amount = await ERC20Minter.mint(payTokenAddress, elctPresale.address, 10000)
+      const balanceBefore = await balanceOf(payTokenAddress, owner.address)
+      await elctPresale.connect(owner).withdraw(payTokenAddress, amount)
+      const balanceAfter = await balanceOf(payTokenAddress, owner.address)
+      assert(
+        balanceAfter.sub(balanceBefore).gt(amount.mul(95).div(100)) &&
+          balanceAfter.sub(balanceBefore).lt(amount.mul(105).div(100)),
+        'withdrawnBalance!',
+      )
+    })
+  }
+
+  it('Error: user withdraw', async () => {
+    const withdrawnBalance = await elct.balanceOf(elctPresale.address)
+    await expect(elctPresale.connect(user).withdraw(ELCT, withdrawnBalance)).to.be.revertedWith(
+      'Ownable: caller is not the owner',
+    )
+  })
+
+  it('Regular: owner add pay token', async () => {
+    await elctPresale.connect(owner).addPayToken(LINK, CHAINLINK_LINK_USD)
+    assert((await elctPresale.payTokensPricers(LINK)) == CHAINLINK_LINK_USD, 'pricer set failed!')
+  })
+
+  it('Error: user add pay token', async () => {
+    await expect(
+      elctPresale.connect(user).addPayToken(LINK, CHAINLINK_LINK_USD),
+    ).to.be.revertedWith('Ownable: caller is not the owner')
   })
 
   for (const payTokenAddress of [USDT, WBNB]) {
