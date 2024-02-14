@@ -15,7 +15,6 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
     address public elct;
     address public elctPricer;
 
-    uint256 public constant USD_DECIMALS = 18;
     uint256 public constant PRICERS_DECIMALS = 8;
 
     mapping(address token => address pricer) public payTokensPricers;
@@ -86,7 +85,7 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
     function withdraw(address _token, uint256 _amount) external {
         _checkOwner();
         if (_token == address(0)) {
-            (bool success, ) = msg.sender.call{value: _amount}("");
+            (bool success, ) = msg.sender.call{ value: _amount }("");
             require(success, "withdraw transfer failed!");
         } else {
             IERC20Metadata(_token).safeTransfer(msg.sender, _amount);
