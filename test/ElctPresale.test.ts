@@ -141,18 +141,29 @@ describe(`ElctPresale`, () => {
         'withdrawnBalance!',
       )
     })
-  }
 
-  it('Error: user withdraw', async () => {
-    const withdrawnBalance = await elct.balanceOf(elctPresale.address)
-    await expect(elctPresale.connect(user).withdraw(ELCT, withdrawnBalance)).to.be.revertedWith(
-      'Ownable: caller is not the owner',
-    )
-  })
+    it('Error: user withdraw', async () => {
+      const amount = await ERC20Minter.mint(payTokenAddress, elctPresale.address, 10000)
+      await expect(elctPresale.connect(user).withdraw(payTokenAddress, amount)).to.be.revertedWith(
+        'Ownable: caller is not the owner',
+      )
+    })
+  }
 
   it('Regular: owner add pay token', async () => {
     await elctPresale.connect(owner).addPayToken(LINK, CHAINLINK_LINK_USD)
     assert((await elctPresale.payTokensPricers(LINK)) == CHAINLINK_LINK_USD, 'pricer set failed!')
+  })
+
+  it('Regular: owner delete pay token', async () => {
+    await elctPresale.connect(owner).deletePayToken(USDT)
+    assert((await elctPresale.payTokensPricers(USDT)) == ethers.constants.AddressZero, 'pricer not deleted!')
+  })
+  
+  it('Error: user delete pay token', async () => {
+    await expect(
+      elctPresale.connect(user).deletePayToken(USDT),
+    ).to.be.revertedWith('Ownable: caller is not the owner')
   })
 
   it('Error: user add pay token', async () => {
