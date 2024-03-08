@@ -47,6 +47,7 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
         require(_elctAmount != 0, "_elctAmount is zero!");
         IERC20Metadata _elct = IERC20Metadata(elct);
         uint256 payTokenAmount = elctAmountToToken(_elctAmount, _payToken);
+        require(payTokenAmount > 0, "payTokenAmount is zero!");
         require(payTokenAmount <= _maxPayTokenAmount, "_maxPayTokenAmount!");
         if (_payToken == address(0)) {
             require(msg.value >= payTokenAmount, "value < payTokenAmount");
@@ -97,9 +98,10 @@ contract ElctPresale is UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgr
         require(address(pricer) != address(0), "not supported token!");
 
         (, int256 tokenPrice, , , ) = pricer.latestRoundData();
+        (, int256 elctPrice, , , ) = IPricer(elctPricer).latestRoundData();
         uint256 decimals = _token == address(0) ? 18 : IERC20Metadata(_token).decimals();
         return
-            (_elctAmount * (10 ** decimals) * (10 ** PRICERS_DECIMALS)) /
+            (_elctAmount * uint256(elctPrice) * (10 ** decimals)) /
             uint256(tokenPrice) /
             1e18;
     }

@@ -44,7 +44,8 @@ const config: HardhatUserConfig = {
         count: 10,
         accountsBalance: '1000000000000000000000000000',
       },
-      loggingEnabled: true,
+      // loggingEnabled: true,
+      loggingEnabled: false,
       // mining: {
       //   auto: false,
       //   interval: 2000,
